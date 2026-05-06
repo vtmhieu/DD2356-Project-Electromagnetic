@@ -71,3 +71,13 @@ This application simulates electromagnetic wave propagation using the Finite-Dif
 *   **Hieu:** OpenMP, plotting
 *   **Serban:** MPI, correctness
 *   **Teddy:** Optimization, profiling
+
+### Baseline C/C++ Implementation
+
+1. **Identify useful metrics for performance profiling and present their measurement on the 3 computing systems**
+
+
+### OpenMP 
+1. **Identify compute-intensive parts and implement OpenMP parallelization**
+
+    
