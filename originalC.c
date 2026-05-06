@@ -1,12 +1,14 @@
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #define NX 400      // Total number of spatial points
 #define NSTEPS 1000 // Number of time steps
 #define DX 1.0      // Spatial step size
 #define DT 0.5      // Time step size (should satisfy the CFL condition)
 #define PI 3.141592653589793
+#define NPLOTTINGS 10
 
 // Function to initialize the electric field with a Gaussian pulse
 void initialize_fields(double *E, double *H) {
@@ -51,10 +53,19 @@ int main() {
   // Initialize fields
   initialize_fields(E, H);
 
+  // save the electric field at various steps
+  double **E_at_timestep = (double **) malloc(NPLOTTINGS * sizeof(double*));
+  for (int i = 0; i < NPLOTTINGS; i++) {
+    E_at_timestep[i] = (double *) malloc(NX * sizeof(double));
+  }
+
   // Main FDTD loop
   for (int t = 0; t < NSTEPS; t++) {
     update_H(E, H);
     update_E(E, H);
+    if (t % (NSTEPS / NPLOTTINGS) == 0) {
+      memcpy(E_at_timestep[t / (NSTEPS / NPLOTTINGS)], E, sizeof(double) * NX);
+    }
   }
 
   // Output final snapshot of the electric field for verification
@@ -64,7 +75,26 @@ int main() {
   }
   printf("\n");
 
+  // for each of the steps, open a file to write them
+  for (int i = 0; i < NPLOTTINGS; i++) {
+    // open file inside data_for_plotting/serial
+    char file_name[100];
+    snprintf(file_name, sizeof(file_name), "data_for_plotting/serial/E_field_step_%d.txt", i);
+    FILE* out_file = fopen(file_name, "w");
+    // test file is not null
+    if (out_file == NULL)
+      {  
+        printf("Error! Could not open file\n");
+        exit(-1); // must include stdlib.h
+      }
+
+    for (int j = 0; j < NX; j++) {
+      fprintf(out_file, "%f ", E_at_timestep[i][j]);
+    }
+    fclose(out_file);
+  }
   free(E);
+  free(E_at_timestep);
   free(H);
   return 0;
 }
