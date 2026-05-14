@@ -4,10 +4,10 @@
 #include <string.h>
 
 #ifndef NX
-#define NX 4000      // Total number of spatial points
+#define NX 80000      // Total number of spatial points
 #endif
 #ifndef NSTEPS
-#define NSTEPS 1000 // Number of time steps
+#define NSTEPS 20000 // Number of time steps
 #endif
 #define DX 1.0      // Spatial step size
 #define DT 0.5      // Time step size (should satisfy the CFL condition)
@@ -67,18 +67,22 @@ int main() {
   for (int t = 0; t < NSTEPS; t++) {
     update_H(E, H);
     update_E(E, H);
+    #ifdef ENABLE_PLOTTING
     if (t % (NSTEPS / NPLOTTINGS) == 0) {
       memcpy(E_at_timestep[t / (NSTEPS / NPLOTTINGS)], E, sizeof(double) * NX);
     }
+    #endif
   }
 
-  // Output final snapshot of the electric field for verification
-  printf("Final electric field snapshot:\n");
-  for (int i = 0; i < NX; i++) {
-    printf("%f ", E[i]);
-  }
-  printf("\n");
+  // TODO: I don't understand why we have this
+  // // Output final snapshot of the electric field for verification
+  // printf("Final electric field snapshot:\n");
+  // for (int i = 0; i < NX; i++) {
+  //   printf("%f ", E[i]);
+  // }
+  // printf("\n");
 
+  #ifdef ENABLE_PLOTTING
   // for each of the steps, open a file to write them
   for (int i = 0; i < NPLOTTINGS; i++) {
     // open file inside data_for_plotting/serial
@@ -97,12 +101,7 @@ int main() {
     }
     fclose(out_file);
   }
-  for (int i = 0; i < NPLOTTINGS; i++) {
-    free(E_at_timestep[i]);
-  }
-  free(E);
-  free(E_at_timestep);
-  free(H);
+  #endif
 
 
   // get the index of the maximum electric field. Compare it to the expected shift from 
@@ -135,6 +134,13 @@ int main() {
     printf("The maximum electric field is NOT at the expected position.\n");
     printf("Relative error: %f%%\n", relative_error * 100);
   }
+
+  for (int i = 0; i < NPLOTTINGS; i++) {
+    free(E_at_timestep[i]);
+  }
+  free(E);
+  free(E_at_timestep);
+  free(H);
 
 
   return 0;

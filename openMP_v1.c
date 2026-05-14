@@ -2,17 +2,21 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <omp.h>
 
 #ifndef NX
-#define NX 4000      // Total number of spatial points
+#define NX 80000      // Total number of spatial points
 #endif
 #ifndef NSTEPS
-#define NSTEPS 1000 // Number of time steps
+#define NSTEPS 20000 // Number of time steps
 #endif
 #define DX 1.0      // Spatial step size
 #define DT 0.5      // Time step size (should satisfy the CFL condition)
 #define PI 3.141592653589793
 #define NPLOTTINGS 50
+#ifndef THREAD_COUNT
+#define THREAD_COUNT 4
+#endif
 
 // Function to initialize the electric field with a Gaussian pulse
 void initialize_fields(double *E, double *H) {
@@ -28,6 +32,7 @@ void initialize_fields(double *E, double *H) {
 // Function to update the magnetic field H
 void update_H(double *E, double *H) {
   // Update H from 0 to NX-2 (using forward differences)
+  #pragma omp parallel for schedule(static)
   for (int i = 0; i < NX - 1; i++) {
     H[i] = H[i] + (DT / DX) * (E[i + 1] - E[i]);
   }
@@ -38,6 +43,7 @@ void update_H(double *E, double *H) {
 // Function to update the electric field E
 void update_E(double *E, double *H) {
   // Update E from 1 to NX-1 (using backward differences)
+  #pragma omp parallel for schedule(static)
   for (int i = 1; i < NX; i++) {
     E[i] = E[i] + (DT / DX) * (H[i] - H[i - 1]);
   }
@@ -46,6 +52,9 @@ void update_E(double *E, double *H) {
 }
 
 int main() {
+  omp_set_num_threads(THREAD_COUNT);
+
+
   // Allocate fields
   double *E = (double *)malloc(NX * sizeof(double));
   double *H = (double *)malloc(NX * sizeof(double));
@@ -67,23 +76,27 @@ int main() {
   for (int t = 0; t < NSTEPS; t++) {
     update_H(E, H);
     update_E(E, H);
+    #ifdef ENABLE_PLOTTING
     if (t % (NSTEPS / NPLOTTINGS) == 0) {
       memcpy(E_at_timestep[t / (NSTEPS / NPLOTTINGS)], E, sizeof(double) * NX);
     }
+    #endif
   }
 
-  // Output final snapshot of the electric field for verification
-  printf("Final electric field snapshot:\n");
-  for (int i = 0; i < NX; i++) {
-    printf("%f ", E[i]);
-  }
-  printf("\n");
+  // TODO: I don't understand why we have this
+  // // Output final snapshot of the electric field for verification
+  // printf("Final electric field snapshot:\n");
+  // for (int i = 0; i < NX; i++) {
+  //   printf("%f ", E[i]);
+  // }
+  // printf("\n");
 
+  #ifdef ENABLE_PLOTTING
   // for each of the steps, open a file to write them
   for (int i = 0; i < NPLOTTINGS; i++) {
     // open file inside data_for_plotting/serial
     char file_name[100];
-    snprintf(file_name, sizeof(file_name), "data_for_plotting/serial/E_field_step_%d.txt", i);
+    snprintf(file_name, sizeof(file_name), "data_for_plotting/omp/E_field_step_%d.txt", i);
     FILE* out_file = fopen(file_name, "w");
     // test file is not null
     if (out_file == NULL)
@@ -97,12 +110,7 @@ int main() {
     }
     fclose(out_file);
   }
-  for (int i = 0; i < NPLOTTINGS; i++) {
-    free(E_at_timestep[i]);
-  }
-  free(E);
-  free(E_at_timestep);
-  free(H);
+  #endif
 
 
   // get the index of the maximum electric field. Compare it to the expected shift from 
@@ -135,6 +143,13 @@ int main() {
     printf("The maximum electric field is NOT at the expected position.\n");
     printf("Relative error: %f%%\n", relative_error * 100);
   }
+
+  for (int i = 0; i < NPLOTTINGS; i++) {
+    free(E_at_timestep[i]);
+  }
+  free(E);
+  free(E_at_timestep);
+  free(H);
 
 
   return 0;
