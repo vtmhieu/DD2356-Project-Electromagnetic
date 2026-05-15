@@ -255,10 +255,15 @@ This application simulates electromagnetic wave propagation using the Finite-Dif
 
 
     **Dardel**
-    for the openMP version: 
-    For the openMP 16 threads version:
+    On dardel, one can as easily as run:
+    `sbatch running_scripts/dardel_run.sh`
+    This function will print inside `serial_timing.log` and `omp_timing.log`. Hence, let's take the lowest time
+    for the openMP version (8 threads): 2.5 seconds
+    For the openMP 4 threads version:3.01s
 
-    For the serial version:
+    Will not even test for 16 threads
+
+    For the serial version:10.662s (the timinds differ by around 0.02 seconds, which is nice).
 
     Speedup: 
 
