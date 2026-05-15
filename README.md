@@ -183,5 +183,90 @@ This application simulates electromagnetic wave propagation using the Finite-Dif
     ```
     Hence, it is correct.
 
+3. **Model the inter-thread communication overhead and analyze how it may affect scalability**
+
+    It is known that the computation time in the serial version is 
+
+    T_serial = T_compute
+
+    In the parallel version, we have:
+
+    T_parallel = T_compute / P + T_overhead
+
+    where P is the number of threads, and T_overhead is the time spent on inter-thread communication, synchronization and coherence cost (didn't know how this was called but Gemini helped me, or hallucinated hehe).
+
+    inter-thread communication is done through the cache lines. So, whenever a thread is writting to a cache line, it is pulling it from the memory and blocking other thread's access to it.
+    Whenever a core is writting to a cache line that is shared (multiple cores are working on the same data taken from L3), it is in fact trying to write to a copy it has in L1. Before it can do that, it sends a request for ownership to the other cores. Hence, if other cores were reading or tryint to write to that data, then they would have to flush and wait for the changes. This is what happens behind false sharing. This is the cost of coherence. A good thing is that in this case we don't have any inter-thread communication cost, and only have synchronization cost.
+
+    **Synchronization cost**
+    The syncrhonization cost for pragma omp for is the barrier in the end (as all threads have to finish before the next iteration).
+    
+    The serial code is taking approximatelly 5.3 seconds.
+    That would mean, that with 8 threads running at the same time, the new hypotethical time would be 5.3/8 = 0.66 seconds.
+    The time it takes the openMP version is around 0.865 seconds on averge. That would mean that the overhead is of around 0.2 seconds.
+    This overhead comes from creating and deleting threads multiple times. It comes from the barriers that are at every `#pragma parallel for loop`.
+
+    **How would it affect scalability?**
+
+    This overhead will be a big problem for the increasing number of steps. At each step, the threads and barriers are created. With the increase of NX, the overhead will remain constant, as all threads intersect in the cache the same amount of times. Also, they spawn the same number of times. The only problem would be if some threads are slower than others and will finish a lot faster, but for this a `schedule(guided)` will sove it.
+    We also tested how it would be to create all the threads a single time and use them afterwards
+
+    **Regarding other implementations for OpenMP**
+    We also tried multiple variants for the program. we tried spawning all the threads a single time, as you can see inside `artifacts_for_testing`:
+
+    ```c
+    // Main FDTD loop
+    #pragma omp parallel 
+    {
+    for (int t = 0; t < NSTEPS; t++) {
+        update_H(){
+                #pragma omp for simd schedule(static)
+                for (int i = 0; i < NX - 1; i++) {}
+            }
+        }
+    }
+    ```
+    This resulted in consistently higher results by 0.1 seconds.
 
 
+    **Regarding potential problems regarding performance**
+    1. cold start
+        the size of the whole memory is 80K elems * 8 bytes (as we have double). This means it would either way not be able to fir inside the L1 cache or the L2 cache. Cache will either way be evicted and fetched back NSTEPS times. There is no need to worry about the cold start, what we have a "cold start" tens of thousends of times.
+
+    2. clock granularity
+        the total amount of time approaches 1 second for the omp version, hence it will not be a problem (only if we decide to measure every loop). 
+    3. Smart compiler
+        we are printing the E vector in the end. So no optimization by the compiler.
+    4. avoid inference by
+        running on dardel and hoping for the best, also running multiple times.
+
+
+4. **Evaluate parallel speedup compared to the serial code on the 3 computing systems**
+
+    For this task, we decided to run each algorithm on every machine 3 times, and take for each one of them the lowest time (the STEAM method hehe). We used the tool utility of `time`.
+
+    **Local Machine**
+    for the openMP version: 0.847s
+    To mention that the openMP version with 16 threads has the time: 0.855
+
+    For the serial version: 5.318s
+
+    Speedup: 5.318 / 0.847 = 6.27; for 8 threads. Great success!
+
+
+    **Dardel**
+    for the openMP version: 
+    For the openMP 16 threads version:
+
+    For the serial version:
+
+    Speedup: 
+
+
+    **School Cluster**
+    for the openMP version: 
+    For the openMP 16 threads version:
+
+    For the serial version:
+
+    Speedup: 

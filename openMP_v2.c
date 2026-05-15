@@ -30,27 +30,33 @@ void initialize_fields(double *E, double *H) {
 }
 
 // Function to update the magnetic field H
-void update_H(double *E, double *H) {
+void update_H(double *E, double *H, int start, int finish) {
   // Update H from 0 to NX-2 (using forward differences)
-  #pragma omp for simd schedule(static)
-  for (int i = 0; i < NX - 1; i++) {
+  // #pragma omp parallel for schedule(static)
+
+  // for (int i = 0; i < NX - 1; i++) {
+  for (int i = start; i < finish; i++) {
     H[i] = H[i] + (DT / DX) * (E[i + 1] - E[i]);
   }
   // Simple absorbing boundary condition:
-  #pragma omp single
-  H[NX - 1] = H[NX - 2];
+  if(omp_get_thread_num() == 0)
+    H[NX - 1] = H[NX - 2];
 }
+// i =  0 -> ((NX-1)/max_nr_threads -1)
+// -> E will be i -> (NX-1)/max_nr_threads
+// But this E has to be modified first by the thread at the boundary. That means that that thread will first need to modify it's own H completelly
 
 // Function to update the electric field E
-void update_E(double *E, double *H) {
+void update_E(double *E, double *H, int start, int finish) {
   // Update E from 1 to NX-1 (using backward differences)
-  #pragma omp for simd schedule(static)
-  for (int i = 1; i < NX; i++) {
+  // #pragma omp parallel for schedule(static)
+  // for (int i = 1; i < NX; i++) {
+  for (int i = start; i < finish; i++) {
     E[i] = E[i] + (DT / DX) * (H[i] - H[i - 1]);
   }
   // Simple absorbing boundary condition:
-  #pragma omp single
-  E[0] = E[1];
+  if(omp_get_thread_num() == 0)
+    E[0] = E[1];
 }
 
 int main() {
@@ -75,17 +81,20 @@ int main() {
   }
 
   // Main FDTD loop
-  #pragma omp parallel 
+  #pragma omp parallel
   {
-    for (int t = 0; t < NSTEPS; t++) {
-      update_H(E, H);
-      update_E(E, H);
-      #ifdef ENABLE_PLOTTING
-      if (t % (NSTEPS / NPLOTTINGS) == 0) {
-        memcpy(E_at_timestep[t / (NSTEPS / NPLOTTINGS)], E, sizeof(double) * NX);
-      }
-      #endif
+  int my_id = omp_get_thread_num();
+  int max_nr_threads = omp_get_num_threads();
+  for (int t = 0; t < NSTEPS; t++) {
+
+    update_H(E, H, my_id * (NX - 1) / max_nr_threads, (my_id + 1) * (NX - 1) / max_nr_threads - 1);
+    update_E(E, H, my_id * (NX) / max_nr_threads, (my_id + 1) * (NX) / max_nr_threads - 1);
+    #ifdef ENABLE_PLOTTING
+    if (t % (NSTEPS / NPLOTTINGS) == 0) {
+      memcpy(E_at_timestep[t / (NSTEPS / NPLOTTINGS)], E, sizeof(double) * NX);
     }
+    #endif
+  }
   }
 
   // TODO: I don't understand why we have this
