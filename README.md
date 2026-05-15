@@ -265,13 +265,16 @@ This application simulates electromagnetic wave propagation using the Finite-Dif
 
     For the serial version:10.662s (the timinds differ by around 0.02 seconds, which is nice).
 
-    Speedup: 
+    Speedup: 4.26 (for the 8 thread version)
+    Speedup: 3.56 (for the 4 thread version)
 
 
     **School Cluster**
-    for the openMP version: 
-    For the openMP 16 threads version:
+    for the openMP 8 threads version: 0.879s
+    For the openMP 16 threads version:0.550s
 
-    For the serial version:
+    From 32 threads onwards the performance degrades.
 
-    Speedup: 
+    For the serial version: 5.209s
+
+    Speedup: 9.47 (for 16 threads).

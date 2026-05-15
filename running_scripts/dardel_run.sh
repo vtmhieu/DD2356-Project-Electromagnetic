@@ -16,14 +16,38 @@
 
 
 cc originalC.c -o originalC -lm
-cc -fopenmp openMP_v1.c -o openMP_v1 -lm -DTHREAD_COUNT=8
 
 echo "Starting Serial Benchmarks"
 for i in $(seq 1 10); do 
   { time ./originalC > /dev/null; } 2>> serial_timing.log
 done
 
+cc -fopenmp openMP_v1.c -o openMP_v1 -lm -DTHREAD_COUNT=8
+
 echo "Starting OpenMP Benchmarks"
 for i in $(seq 1 10); do 
-  { time ./openMP_v1 > /dev/null; } 2>> omp_timing.log
+  { time ./openMP_v1 > /dev/null; } 2>> omp_timing_8t.log
+done
+
+cc -fopenmp openMP_v1.c -o openMP_v1 -lm -DTHREAD_COUNT=16
+
+echo "Starting OpenMP Benchmarks"
+for i in $(seq 1 10); do 
+  { time ./openMP_v1 > /dev/null; } 2>> omp_timing_16t.log
+done
+
+
+cc -fopenmp openMP_v1.c -o openMP_v1 -lm -DTHREAD_COUNT=32
+
+echo "Starting OpenMP Benchmarks"
+for i in $(seq 1 10); do 
+  { time ./openMP_v1 > /dev/null; } 2>> omp_timing_32t.log
+done
+
+
+cc -fopenmp openMP_v1.c -o openMP_v1 -lm -DTHREAD_COUNT=64
+
+echo "Starting OpenMP Benchmarks"
+for i in $(seq 1 10); do 
+  { time ./openMP_v1 > /dev/null; } 2>> omp_timing_64t.log
 done
