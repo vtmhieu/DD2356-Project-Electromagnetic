@@ -21,11 +21,11 @@ time ./originalC
 # hardware counters (cache misses, instructions, cycles)
 perf stat -e cache-misses,cache-references,L1-dcache-loads,L1-dcache-load-misses,cycles,instructions ./originalC
 
-sudo perf stat -e L1-dcache-load-misses,L1-dcache-store-misses,LLC-loads,LLC-load-misses ./originalC
+perf stat -e L1-dcache-load-misses,L1-dcache-store-misses,LLC-loads,LLC-load-misses ./originalC
 
-sudo perf stat -e branch-instructions,branch-misses ./originalC
+perf stat -e branch-instructions,branch-misses ./originalC
 
-sudo perf stat -e dTLB-loads,dTLB-load-misses,dTLB-stores,dTLB-store-misses ./originalC
+perf stat -e dTLB-loads,dTLB-load-misses,dTLB-stores,dTLB-store-misses ./originalC
 
 # find hotspots
 perf record -g ./originalC
