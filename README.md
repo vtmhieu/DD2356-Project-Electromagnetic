@@ -75,6 +75,75 @@ This application simulates electromagnetic wave propagation using the Finite-Dif
 ### Baseline C/C++ Implementation
 
 1. **Identify useful metrics for performance profiling and present their measurement on the 3 computing systems**
+    - **Personal Computer**
+        - First of all, compilation, with specification of size
+            ```bash
+            gcc originalC.c -o originalC -lm -O0 -DNX=400 -DNSTEPS=1000
+            ```
+        - By keeping a way too low matrix size:
+            - **time**
+                ```bash
+                time ./originalC
+                real	0m0.005s
+                user	0m0.004s
+                sys	0m0.001s
+                ```
+            - **perf**
+                For the perf stat, we used first:
+                ```bash
+                sudo perf stat -e cache-misses,cache-references,L1-dcache-loads,L1-dcache-load-misses,cycles,instructions ./originalC
+                119,053      cache-misses                     #   49.96% of all cache refs           (18.72%)
+                238,309      cache-references                                                        (47.08%)
+                7,212,485      L1-dcache-loads                                                         (75.45%)
+                    8,864      L1-dcache-load-misses            #    0.12% of all L1-dcache accesses   (81.28%)
+                7,832,944      cycles                                                                  (52.92%)
+                34,099,260      instructions                     #    4.35  insn per cycle              (24.55%)
+                ```
+                2 vectors of 400 doubles, which is around 6KB, hence all of it fits inside L1 cache, hence low L1 cache misses. The first cache missses are form LLC. But we can see that the code is staying inside L1, so probably from startup. The 4.35 insn per cycle means that the code is getting pipelined (as it would have maximum 5). We decided against vector operations at this stage, as they are not the purpose of this assignment (-O0).
+
+                Now let's look over the memory accessed:
+                ```c
+                E[i] = E[i] + (DT / DX) * (H[i] - H[i - 1]);
+                H[i] = H[i] + (DT / DX) * (E[i + 1] - E[i]);
+                ```
+                From what we can see, there are 2 writes, and 4 reads
+                `6 * 400 * 1000 * 8bytes = 19.2MB of data accessed in 0.005 seconds -> 3.8GB/s
+
+                ```bash
+                sudo perf stat -e branch-instructions,branch-misses ./originalC
+                1,082,922      branch-instructions                                                   
+                36,286      branch-misses                    #    3.35% of all branches      
+                ```
+
+                Not too many branch misses, as it is computed only when we are in the for loop
+
+                ```bash
+                sudo perf stat -e dTLB-loads,dTLB-load-misses,dTLB-stores,dTLB-store-misses ./originalC
+                2,648      dTLB-loads                                                            
+                789      dTLB-load-misses                 #   29.80% of all dTLB cache accesses
+                ```
+
+                Yeah, that is quite some bad performance. In a page, there is like 4KB. that means that there should be a page miss every like 512 times.
+                Might be due to the program size and the startup cost.
+            - perf hotspots
+            
+            | Self % | Total % | Command | Symbol |
+            |---|---|---|---|
+            | 76.91% | 0.00% | originalC | main |
+            | 44.48% | 41.08% | originalC | update_E |
+            | 32.55% | 32.55% | originalC | update_H |
+            So, as we can see, the update function take most of the time
+
+
+    
+
+                
+
+    Perf stat
+    place app on the roofline model?
+2. **Approximate the upper bound of parallel speedup**
+
+    
 
 
 ### OpenMP 
