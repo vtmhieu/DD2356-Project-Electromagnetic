@@ -1,6 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import re
+import os
 
 # File where the C program's output is saved
 def plot(folder, output_graph):
@@ -53,9 +54,17 @@ if __name__ == "__main__":
     # open all the files in data_for_plotting/serial and plot them in one figure and save the figure as field_plot.png
     folder = 'data_for_plotting/serial/'
     output_graph = 'plots/field_plot_serial.png'
-    plot(folder, output_graph)
+    if os.path.exists(folder):
+        plot(folder, output_graph)
 
     # plot for the openMP version
     folder = 'data_for_plotting/omp/'
     output_graph = 'plots/field_plot_omp.png'
-    plot(folder, output_graph)
+    if os.path.exists(folder):
+        plot(folder, output_graph)
+
+    # plot for the mpi version
+    folder = 'data_for_plotting/mpi/'
+    output_graph = 'plots/field_plot_mpi.png'
+    if os.path.exists(folder):
+        plot(folder, output_graph)
