@@ -1,0 +1,141 @@
+Expected position of the maximum electric field: 50000.000000
+Actual position of the maximum electric field: 49994.000000
+The maximum electric field is NOT at the expected position.
+Relative error: 0.012000%
+Expected position of the maximum electric field: 50000.000000
+Actual position of the maximum electric field: 49994.000000
+The maximum electric field is NOT at the expected position.
+Relative error: 0.012000%
+Expected position of the maximum electric field: 50000.000000
+Actual position of the maximum electric field: 49994.000000
+The maximum electric field is NOT at the expected position.
+Relative error: 0.012000%
+Expected position of the maximum electric field: 50000.000000
+Actual position of the maximum electric field: 49994.000000
+The maximum electric field is NOT at the expected position.
+Relative error: 0.012000%
+Expected position of the maximum electric field: 50000.000000
+Actual position of the maximum electric field: 49994.000000
+The maximum electric field is NOT at the expected position.
+Relative error: 0.012000%
+Expected position of the maximum electric field: 50000.000000
+Actual position of the maximum electric field: 49994.000000
+The maximum electric field is NOT at the expected position.
+Relative error: 0.012000%
+# To display the perf.data header info, please use --header/--header-only options.
+#
+#
+# Total Lost Samples: 0
+#
+# Samples: 46K of event 'cycles:u'
+# Event count (approx.): 35934397586
+#
+# Children      Self  Command    Shared Object       Symbol                   
+# ........  ........  .........  ..................  .........................
+#
+    99.99%     0.00%  originalC  [unknown]           [k] 0x258d4c54415541d7
+            |
+            ---0x258d4c54415541d7
+               __libc_start_main
+               main
+               |          
+               |--50.44%--update_E
+               |          
+                --49.52%--update_H
+
+    99.99%     0.00%  originalC  libc-2.31.so        [.] __libc_start_main
+            |
+            ---__libc_start_main
+               main
+               |          
+               |--50.44%--update_E
+               |          
+                --49.52%--update_H
+
+    99.99%     0.01%  originalC  originalC           [.] main
+            |          
+             --99.98%--main
+                       |          
+                       |--50.44%--update_E
+                       |          
+                        --49.52%--update_H
+
+    50.44%    50.43%  originalC  originalC           [.] update_E
+            |          
+             --50.43%--0x258d4c54415541d7
+                       __libc_start_main
+                       main
+                       update_E
+
+    49.52%    49.51%  originalC  originalC           [.] update_H
+            |          
+             --49.51%--0x258d4c54415541d7
+                       __libc_start_main
+                       main
+                       update_H
+
+     0.02%     0.00%  originalC  [unknown]           [.] 0xffffffffbbc0166d
+     0.02%     0.00%  originalC  [unknown]           [.] 0xffffffffbba75ce2
+     0.01%     0.00%  originalC  [unknown]           [.] 0xffffffffbb07aa3a
+     0.01%     0.01%  originalC  [unknown]           [k] 0xffffffffbb081deb
+     0.01%     0.00%  originalC  [unknown]           [.] 0xffffffffbb07aa0d
+     0.01%     0.00%  originalC  [unknown]           [.] 0xffffffffbb163fe5
+     0.01%     0.00%  originalC  [unknown]           [.] 0xffffffffbb1635ad
+     0.01%     0.00%  originalC  [unknown]           [.] 0xffffffffbb175ec7
+     0.01%     0.00%  originalC  [unknown]           [.] 0xffffffffbb175c8d
+     0.01%     0.00%  originalC  [unknown]           [.] 0xffffffffbb1628d4
+     0.01%     0.00%  originalC  ld-2.31.so          [.] _dl_sysdep_start
+     0.01%     0.01%  originalC  libm-2.31.so        [.] xflow
+     0.01%     0.00%  originalC  originalC           [.] initialize_fields
+     0.01%     0.01%  originalC  ld-2.31.so          [.] _dl_relocate_object
+     0.01%     0.00%  originalC  [unknown]           [.] 0x0000000000000040
+     0.01%     0.00%  originalC  ld-2.31.so          [.] dl_main
+     0.00%     0.00%  originalC  [unknown]           [.] 0xffffffffbb0f21d0
+     0.00%     0.00%  originalC  [unknown]           [.] 0xffffffffbb277664
+     0.00%     0.00%  originalC  [unknown]           [.] 0xffffffffbb00ba67
+     0.00%     0.00%  originalC  [unknown]           [.] 0xffffffffbb00ba04
+     0.00%     0.00%  originalC  [unknown]           [k] 0xffffffffbbc01620
+     0.00%     0.00%  originalC  [unknown]           [.] 0xffffffffbbc00f49
+     0.00%     0.00%  originalC  [unknown]           [.] 0xffffffffbba76517
+     0.00%     0.00%  originalC  [unknown]           [.] 0xffffffffbb097432
+     0.00%     0.00%  originalC  [unknown]           [.] 0xffffffffbb2d714f
+     0.00%     0.00%  originalC  [unknown]           [k] 0xffffffffbb5c6ae8
+     0.00%     0.00%  originalC  [unknown]           [k] 0xffffffffbb0fc2e3
+     0.00%     0.00%  originalC  [unknown]           [.] 0xffffffffbb0f21b2
+     0.00%     0.00%  originalC  [unknown]           [k] 0xffffffffbb5c6aa6
+     0.00%     0.00%  originalC  [unknown]           [.] 0xffffffffbb5c6beb
+     0.00%     0.00%  originalC  [unknown]           [k] 0xffffffffbb16708a
+     0.00%     0.00%  originalC  [unknown]           [.] 0xffffffffbb163f81
+     0.00%     0.00%  originalC  libm-2.31.so        [.] expf64
+     0.00%     0.00%  originalC  [unknown]           [k] 0xffffffffbb2ce6ea
+     0.00%     0.00%  originalC  libpthread-2.31.so  [.] __pthread_once
+     0.00%     0.00%  originalC  [unknown]           [.] 0xffffffffbb2d6489
+     0.00%     0.00%  originalC  ld-2.31.so          [.] strcmp
+     0.00%     0.00%  originalC  [unknown]           [.] 0x61757162696c0036
+     0.00%     0.00%  originalC  [unknown]           [k] 0xffffffffbb2d6054
+     0.00%     0.00%  originalC  libm-2.31.so        [.] __ieee754_exp_fma
+     0.00%     0.00%  originalC  ld-2.31.so          [.] check_match
+     0.00%     0.00%  originalC  [unknown]           [.] 0xe9943844ca90eebd
+     0.00%     0.00%  originalC  ld-2.31.so          [.] do_lookup_x
+     0.00%     0.00%  originalC  ld-2.31.so          [.] _dl_next_ld_env_entry
+     0.00%     0.00%  originalC  ld-2.31.so          [.] __GI___tunables_init
+     0.00%     0.00%  originalC  [unknown]           [.] 0x5249445f54494d42
+     0.00%     0.00%  originalC  [unknown]           [.] 0x455f524548434e55
+     0.00%     0.00%  originalC  ld-2.31.so          [.] _dl_start_user
+     0.00%     0.00%  originalC  ld-2.31.so          [.] _dl_setup_hash
+     0.00%     0.00%  originalC  ld-2.31.so          [.] _dl_start
+     0.00%     0.00%  originalC  [unknown]           [k] 0xffffffffbb2d6014
+     0.00%     0.00%  originalC  [unknown]           [k] 0xffffffffbb2d6456
+     0.00%     0.00%  originalC  [unknown]           [k] 0xffffffffbb11fff3
+     0.00%     0.00%  originalC  [unknown]           [k] 0xffffffffbb097424
+     0.00%     0.00%  originalC  ld-2.31.so          [.] _start
+     0.00%     0.00%  originalC  [unknown]           [.] 0xffffffffbb097351
+
+
+#
+# (Tip: check path of tips.txt or get more memory! ;-p)
+#
+Expected position of the maximum electric field: 50000.000000
+Actual position of the maximum electric field: 49994.000000
+The maximum electric field is NOT at the expected position.
+Relative error: 0.012000%

@@ -1,0 +1,8 @@
+--- Performance Metrics ---
+Initialization time: 0.000288 seconds
+Main loop time: 1.182943 seconds
+--- Verification ---
+Expected position: 50000.000000
+Actual position: 49994.000000
+The maximum electric field is NOT at the expected position.
+Relative error: 0.012000%
