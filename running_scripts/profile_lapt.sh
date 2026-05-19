@@ -14,7 +14,9 @@
 #SBATCH --nodes=1
 #SBATCH -e error_file.e
 
-cc originalC.c -o originalC -lm -O0 -DNX=400 -DNSTEPS=1000
+cc -fopenmp openMP_v1.c -o originalC -lm -O0 -DTHREAD_COUNT=8
+
+# cc originalC.c -o originalC -lm -O0 -DNX=400 -DNSTEPS=1000
 # Basic timing
 time ./originalC
 

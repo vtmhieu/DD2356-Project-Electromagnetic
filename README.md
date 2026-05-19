@@ -134,18 +134,357 @@ This application simulates electromagnetic wave propagation using the Finite-Dif
             | 32.55% | 32.55% | originalC | update_H |
             So, as we can see, the update function take most of the time
 
+    - **Big Boy Dardel**
+        - First of all, compilation, with specification of size
+            ```bash
+            cc originalC.c -o originalC -lm -O0 -DNX=400 -DNSTEPS=1000
+            ```
+            one could also run
+            ```bash
+            sbatch ./running_scripts_profile_lapt.sh
+            ```
+        - By keeping a way too low matrix size:
+            - **time**
+                ```bash
+                time ./originalC
+                real	0m0.008s
+                user	0m0.003s
+                sys	0m0.004s
+
+                ```
+            - **perf**
+                For the perf stat, we used first:
+                ```bash
+                sudo perf stat -e cache-misses,cache-references,L1-dcache-loads,L1-dcache-load-misses,cycles,instructions ./originalC
+                    26,581      cache-misses:u                   #   21.347 % of all cache refs    
+                124,521      cache-references:u                                                 
+                14,799,274      L1-dcache-loads:u                                                  
+                    20,959      L1-dcache-load-misses:u          #    0.14% of all L1-dcache accesses
+                13,040,683      cycles:u                                                           
+                22,248,016      instructions:u                   #    1.71  insn per cycle        
+                ```
+                Similar results as personal computer. Only difference is that insn is very low. Seems like dardel doesn't do optimiations automatically
+
+                Now let's look over the memory accessed:
+                ```c
+                E[i] = E[i] + (DT / DX) * (H[i] - H[i - 1]);
+                H[i] = H[i] + (DT / DX) * (E[i + 1] - E[i]);
+                ```
+                From what we can see, there are 2 writes, and 4 reads
+                `6 * 400 * 1000 * 8bytes = 19.2MB of data accessed in 0.008 seconds -> 2.4GB/s
+
+                ```bash
+                sudo perf stat -e branch-instructions,branch-misses ./originalC
+                2,439,158      branch-instructions:u                                              
+                26,754      branch-misses:u                  #    1.10% of all branches        
+
+                ```
+                Not too many branch misses, as it is computed only when we are in the for loop
+
+                ```bash
+                sudo perf stat -e dTLB-loads,dTLB-load-misses,dTLB-stores,dTLB-store-misses ./originalC
+                13,768      dTLB-loads:u                                                       
+                2,019      dTLB-load-misses:u               #   14.66% of all dTLB cache accesses
+                ```
+                There are significantly more pages accessed that on the PC. hence less dTLB cache misses rates. 
+            - perf hotspots
+            
+            | Self % | Total % | Command | Symbol |
+            |---|---|---|---|
+            | 76.91% | 0.00% | originalC | main |
+            | 44.48% | 41.08% | originalC | update_E |
+            | 32.55% | 32.55% | originalC | update_H |
+            So, as we can see, the update function take most of the time
+            - chache grind
+            ```bash
+            ==2571594== I   refs:      22,425,686
+            ==2571594== I1  misses:         2,705
+            ```
+            Very low instruciton misses.
+            ```bash
+            ==2571594== D   refs:      14,479,315  (12,444,878 rd   + 2,034,437 wr)
+            ==2571594== D1  misses:        39,176  (    33,789 rd   +     5,387 wr)
+            ==2571594== LLd misses:        20,916  (    17,050 rd   +     3,866 wr)
+            ==2571594== D1  miss rate:        0.3% (       0.3%     +       0.3%  )
+            ==2571594== LLd miss rate:        0.1% (       0.1%     +       0.2%  )
+            ```
+            We can see preciselly the number of reads and writes that are being done (which is as we computed, 6 * 8 * 400 * 1000).
+
+    - **School Cluster**
+        - First of all, compilation, with specification of size
+            ```bash
+            cc originalC.c -o originalC -lm -O0 -DNX=400 -DNSTEPS=1000
+            ```
+        - At the same, time, one could also just run
+            ```bash
+            ./running_scripts_profile_lapt.sh
+            ```
+
+        - By keeping a way too low matrix size:
+            - **time**
+                ```bash
+                time ./originalC
+                real    0m0.003s
+                user    0m0.003s
+                sys     0m0.000s
+                ```
+            - **perf**
+                For the perf stat, we used first:
+                ```bash
+                sudo perf stat -e cache-misses,cache-references,L1-dcache-loads,L1-dcache-load-misses,cycles,instructions ./originalC
+                    14030      cache-misses              #   63.671 % of all cache refs    
+                    22035      cache-references                                            
+                11655339      L1-dcache-loads                                             
+                    12065      L1-dcache-load-misses     #    0.10% of all L1-dcache accesses
+                8511330      cycles                                                      
+                28079302      instructions              #    3.30  insn per cycle        
+                ```
+                Over here there is something interesting. For the personal computer the initial cache loading for LLC took the longest. probably due to the lack of optimizations. For the amount of insn, it is decent
+
+                Now let's look over the memory accessed:
+                ```c
+                E[i] = E[i] + (DT / DX) * (H[i] - H[i - 1]);
+                H[i] = H[i] + (DT / DX) * (E[i + 1] - E[i]);
+                ```
+                From what we can see, there are 2 writes, and 4 reads
+                `6 * 400 * 1000 * 8bytes = 19.2MB of data accessed in 0.003 seconds -> 5.8GB/s
+
+                ```bash
+                sudo perf stat -e branch-instructions,branch-misses ./originalC
+                1138525      branch-instructions                                         
+                9059      branch-misses             #    0.80% of all branches       
+                ```
+
+                Not too many branch misses, as it is computed only when we are in the for loop
+
+                ```bash
+                sudo perf stat -e dTLB-loads,dTLB-load-misses,dTLB-stores,dTLB-store-misses ./originalC
+                11658172      dTLB-loads                                                  
+                1076      dTLB-load-misses          #    0.01% of all dTLB cache accesses
+                ```
+
+                Amazing result for the cache loads and misses. Or not. I suppose that for some reason there are a lot of page lookups getting done (maybe other background processes?).
+            - perf hotspots
+            
+            | Overhead | Self | Binary | Symbol | Function |
+            |----------|------|--------|--------|----------|
+            | 62.70% | 0.00% | originalC | originalC | main |
+            | 43.33% | 43.33% | originalC | originalC | update_E |
+            | 19.37% | 19.37% | originalC | originalC | update_H |
+            
+            So, as we can see, the update functions take most of the time
+
+
+2. **Identify useful metrics for performance profiling and present their measurement on the 3 computing systems With bigger Problem size**
+    - **Personal Computer**
+        - First of all, compilation, with specification of size
+            ```bash
+            gcc originalC.c -o originalC -lm -O0
+            ```
+        - By keeping a way too low matrix size:
+            - **time**
+                ```bash
+                time ./originalC
+                real	0m5.767s
+                user	0m5.762s
+                sys	0m0.004s
+
+                ```
+            - **perf**
+                For the perf stat, we used first:
+                ```bash
+                sudo perf stat -e cache-misses,cache-references,L1-dcache-loads,L1-dcache-load-misses,cycles,instructions ./originalC
+                21,641,634      cache-misses                     #    1.33% of all cache refs           (50.00%)
+                1,632,026,269      cache-references                                                        (50.00%)
+                28,995,750,517      L1-dcache-loads                                                         (50.00%)
+                806,805,279      L1-dcache-load-misses            #    2.78% of all L1-dcache accesses   (50.00%)
+                23,856,689,210      cycles                                                                  (50.00%)
+                105,676,455,719      instructions                     #    4.43  insn per cycle              (50.00%)
+
+                ```
+                The amount of L1 data cache misses is preety high:
+                `E + H = 2 × 80000 × 8 bytes = 1.28 MB`
+                `80000 elements / 8 doubles per cache line = 10,000 cache line loads per array`
+                `2 arrays × 10,000 = 20,000 misses per step`
+                `20,000 × 20,000 steps = 400,000,000 L1 misses`
+                There are 2 functions for updating the E and the H, so it is expectable. 
+                The insn is the same as before.
+
+
+                Now let's look over the memory accessed:
+                ```c
+                E[i] = E[i] + (DT / DX) * (H[i] - H[i - 1]);
+                H[i] = H[i] + (DT / DX) * (E[i + 1] - E[i]);
+                ```
+                From what we can see, there are 2 writes, and 4 reads
+                `6 * 80000 * 20000 * 8bytes = 71.2BB of data accessed in 5.7 seconds -> 14GB/s`
+
+                ```bash
+                sudo perf stat -e branch-instructions,branch-misses ./originalC
+                3,216,589,013      branch-instructions                                                   
+                1,898,515      branch-misses                    #    0.06% of all branches     
+                ```
+
+                Not too many branch misses, as it is computed only when we are in the for loop
+
+                ```bash
+                sudo perf stat -e dTLB-loads,dTLB-load-misses,dTLB-stores,dTLB-store-misses ./originalC
+                12,837,658      dTLB-loads                                                            
+                    36,878      dTLB-load-misses                 #    0.29% of all dTLB cache accesses
+                ```
+
+                Quite some good performance. This makes sense, as pages will get evicted after we go through all their elements (8KB probably, hence a page miss every 1K itertions).
+            - perf hotspots
+
+                | Self % | Total % | Command | Symbol |
+                |--------|---------|---------|--------|
+                | 100.00% | 0.00% | originalC | main |
+                | 50.18% | 49.90% | originalC | update_E |
+                | 49.97% | 49.67% | originalC | update_H |
+
+            So, as we can see, the update function take most of the time
+
+    - **Big Boy Dardel**
+        - First of all, compilation, with specification of size
+            ```bash
+            cc originalC.c -o originalC -lm -O0
+            ```
+            one could also run
+            ```bash
+            sbatch ./running_scripts_profile_lapt.sh
+            ```
+        - By keeping a way too low matrix size:
+            - **time**
+                ```bash
+                time ./originalC
+                real	0m11.264s
+                user	0m11.251s
+                sys	0m0.008s
+
+
+                ```
+            - **perf**
+                For the perf stat, we used first:
+                ```bash
+                sudo perf stat -e cache-misses,cache-references,L1-dcache-loads,L1-dcache-load-misses,cycles,instructions ./originalC
+                    13,175,407      cache-misses:u                   #    0.801 % of all cache refs    
+                1,645,551,667      cache-references:u                                                 
+                51,222,765,885      L1-dcache-loads:u                                                  
+                801,149,907      L1-dcache-load-misses:u          #    1.56% of all L1-dcache accesses
+                35,905,756,922      cycles:u                                                           
+                70,412,692,558      instructions:u                   #    1.96  insn per cycle         
+
+
+                ```
+                similar results. The insn got higher, which is nice. 
+                Now let's look over the memory accessed:
+                ```c
+                E[i] = E[i] + (DT / DX) * (H[i] - H[i - 1]);
+                H[i] = H[i] + (DT / DX) * (E[i + 1] - E[i]);
+                ```
+                From what we can see, there are 2 writes, and 4 reads
+                `6 * 80000 * 20000 * 8bytes = 71.2GB of data accessed in 11.2 seconds -> 6.35GB/s`
+
+                ```bash
+                sudo perf stat -e branch-instructions,branch-misses ./originalC
+                6,402,988,318      branch-instructions:u                                              
+                70,723      branch-misses:u                  #    0.00% of all branches      
+
+                ```
+
+                ```bash
+                sudo perf stat -e dTLB-loads,dTLB-load-misses,dTLB-stores,dTLB-store-misses ./originalC
+                12,569,313      dTLB-loads:u                                                       
+                4,801      dTLB-load-misses:u               #    0.04% of all dTLB cache accesses
+                ```
+                Amazing amount of page misses. That means that either all the data stays insid ethe cahce (unlikelly), or that the supercomputer has very big pages! 
+            - chache grind
+
+    - **School Cluster**
+        - First of all, compilation, with specification of size
+            ```bash
+            cc originalC.c -o originalC -lm -O0
+            ```
+        - At the same, time, one could also just run
+            ```bash
+            ./running_scripts/profile_lapt.sh
+            ```
+
+        - By keeping a way too low matrix size:
+            - **time**
+                ```bash
+                time ./originalC
+                real    0m4.997s
+                user    0m4.998s
+                sys     0m0.000s
+                ```
+            - **perf**
+                For the perf stat, we used first:
+                ```bash
+                sudo perf stat -e cache-misses,cache-references,L1-dcache-loads,L1-dcache-load-misses,cycles,instructions ./originalC
+                        144280      cache-misses              #    0.637 % of all cache refs    
+                    22647819      cache-references                                            
+                44805895857      L1-dcache-loads                                             
+                    35447031      L1-dcache-load-misses     #    0.08% of all L1-dcache accesses
+                18942826723      cycles                                                      
+                105621143093      instructions              #    5.58  insn per cycle      
+                ```
+                Holly pipelining! so, there are 6 steps in the pipeline process, and the school cluster ir using them to their maiximum. Although 44 billions L1 loads??? It is quite fair, cause we have 2 funcitons, where 6 operations are being done, for 20000STEPS for 80000 vector sizes.
+
+                Now let's look over the memory accessed:
+                ```c
+                E[i] = E[i] + (DT / DX) * (H[i] - H[i - 1]);
+                H[i] = H[i] + (DT / DX) * (E[i + 1] - E[i]);
+                ```
+                From what we can see, there are 2 writes, and 4 reads
+                `6×2×80000×20000 * 8bytes = 143GB of data accessed in 5 seconds -> 28GB/s
+
+                ```bash
+                sudo perf stat -e branch-instructions,branch-misses ./originalC
+                3204437800      branch-instructions                                         
+                    82452      branch-misses             #    0.00% of all branches       
+                ```
+
+                Not too many branch misses, as it is computed only when we are in the for loop
+
+                ```bash
+                sudo perf stat -e dTLB-loads,dTLB-load-misses,dTLB-stores,dTLB-store-misses ./originalC
+                44806070655      dTLB-loads                                                  
+                4621      dTLB-load-misses          #    0.00% of all dTLB cache accesses
+                ```
+
+                Top notch result once again. Might attribute that to the os doing prefetching of pages, so that the next ones will be automatically in memory. Because, if a page is 2MB (already huge), and we have around 2K entries for the TLB. So, for 4GB of data, but we are using 140GB. So, we will start deleting 2MB pages. We should have more TLB misses, prefetching is being done.
+
+
+3. **Approximate the upper bound of parallel speedup**
+    For the upper bound of parallel speedup let's look at the version that is Nx = 400 and STEP 1000:
+    ```bash
+    Allocation time: 0.000016 seconds
+    Initialization time: 0.000015 seconds
+    Saving time: 0.000087 seconds
+    Main loop time: 0.001810 seconds
+    Verification time: 0.000040 seconds
+    ```
+    The initialization time and main loop time are completelly paralelizable, that would mean that the fraction of code that is serial is
+    f = (0.000016 + 0.000087 + 0.000040) / 0.001968 = 0.073
+
+    Hence, the upper bound of parallel speedup is 1/f = 13.69. This means that we cannot expect to have a speedup bigger than 13.69, even if we have infinite threads.
+
+    Now for NX = 80000 and STEP = 20000:
+    ```bash
+    Allocation time: 0.000039 seconds
+    Initialization time: 0.002310 seconds
+    Saving time: 0.000248 seconds
+    Main loop time: 5.737972 seconds
+    Verification time: 0.000429 seconds
+    ```
+    The initialization time and main loop time are completelly paralelizable, that would mean that the fraction of code that is serial is
+    f = (0.000039 + 0.000248 + 0.000429) / 5.740688 = 0.000122
+
+    Hence, the upper bound of parallel speedup is 1/f = 8196.72. This means that we can expect to have a very good speedup, as the fraction of code that is serial is very low.
+
 
     
-
-                
-
-    Perf stat
-    place app on the roofline model?
-2. **Approximate the upper bound of parallel speedup**
-
-    
-
-
 ### OpenMP 
 1. **Identify compute-intensive parts and implement OpenMP parallelization**
     In order to identify compute-intensive parts, we need to look statically first.
@@ -347,3 +686,55 @@ This application simulates electromagnetic wave propagation using the Finite-Dif
     For the serial version: 5.209s
 
     Speedup: 9.47 (for 16 threads).
+
+5. **Compare those performance metrics with the serial version. Analyze the results.**
+
+    We will compare the results for the *NX = 80000* and *STEP=20000* on the personal machine.
+
+    First of all, modify the `running_scirpts/profile_lapt.sh`, modifying the
+    ```bash
+    cc originalC.c -o originalC -lm -O0
+    # TO
+    cc -fopenmp openMP_v1.c -o originalC -lm -O0 -DTHREAD_COUNT=8. # (uncomment and comment the first lines).
+    ```
+    and then run the benchmark:
+    `./running_scripts/profile_lapt.sh`
+
+    - **Personal Computer**
+        - **time**
+            ```bash
+            time ./originalC
+            real	0m0.892s
+            user	0m7.106s
+            sys	0m0.011s
+            ```
+        - **perf**
+            For the perf stat, we used first:
+            ```bash
+            sudo perf stat -e cache-misses,cache-references,L1-dcache-loads,L1-dcache-load-misses,cycles,instructions ./originalC
+            32,821,478      cache-misses                     #    3.63% of all cache refs           (50.00%)
+            905,001,874      cache-references                                                        (50.06%)
+            28,985,879,781      L1-dcache-loads                                                         (50.02%)
+            815,971,310      L1-dcache-load-misses            #    2.82% of all L1-dcache accesses   (50.03%)
+            26,106,256,491      cycles                                                                  (50.01%)
+            106,051,143,632      instructions                     #    4.06  insn per cycle              (50.00%)
+
+            ```
+            Same amount of cache misses for L1. For the whole cache misses, the amount is 3 times higher. That would mean that more data is being kept inside the lower levels of cache (as we are using more cpus). At the same time, the insn decreased, whouch might point to cpu's doing other activities as well (internet browsers, etc).
+
+
+            ```bash
+            sudo perf stat -e branch-instructions,branch-misses ./originalC
+            3,288,477,270      branch-instructions                                                   
+            4,300,214      branch-misses                    #    0.13% of all branches       
+            ```
+
+            Not too many branch misses, as it is computed only when we are in the for loop
+
+            ```bash
+            sudo perf stat -e dTLB-loads,dTLB-load-misses,dTLB-stores,dTLB-store-misses ./originalC
+            1,257,951      dTLB-loads                                                            
+            18,613      dTLB-load-misses                 #    1.48% of all dTLB cache accesses
+            ```
+
+            Higher amount of dTLV cache misses. The number of misses is constant, as it is from the beginning of the program, but the amount of data kept inside the cache is lower, hence bigger ratio

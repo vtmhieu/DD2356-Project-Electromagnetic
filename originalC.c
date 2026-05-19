@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #ifndef NX
 #define NX 80000      // Total number of spatial points
@@ -46,6 +47,9 @@ void update_E(double *E, double *H) {
 }
 
 int main() {
+
+  // initizalization timing
+  clock_t start_time = clock();
   // Allocate fields
   double *E = (double *)malloc(NX * sizeof(double));
   double *H = (double *)malloc(NX * sizeof(double));
@@ -53,16 +57,29 @@ int main() {
     fprintf(stderr, "Memory allocation failed\n");
     return 1;
   }
+  clock_t end_time = clock();
+  double allocation_time = (double)(end_time - start_time) / CLOCKS_PER_SEC;
+  printf("Allocation time: %f seconds\n", allocation_time);
 
+  start_time = clock();
   // Initialize fields
   initialize_fields(E, H);
+   end_time = clock();
+  double initialization_time = (double)(end_time - start_time) / CLOCKS_PER_SEC;
+  printf("Initialization time: %f seconds\n", initialization_time);
 
+  start_time = clock();
   // save the electric field at various steps
   double **E_at_timestep = (double **) malloc(NPLOTTINGS * sizeof(double*));
   for (int i = 0; i < NPLOTTINGS; i++) {
     E_at_timestep[i] = (double *) malloc(NX * sizeof(double));
   }
+  end_time = clock();
+  double saving_time = (double)(end_time - start_time) / CLOCKS_PER_SEC;
+  printf("Saving time: %f seconds\n", saving_time);
 
+  // main loop timing
+  start_time = clock();
   // Main FDTD loop
   for (int t = 0; t < NSTEPS; t++) {
     update_H(E, H);
@@ -73,6 +90,9 @@ int main() {
     }
     #endif
   }
+  end_time = clock();
+  double main_loop_time = (double)(end_time - start_time) / CLOCKS_PER_SEC;
+  printf("Main loop time: %f seconds\n", main_loop_time);
 
   // TODO: I don't understand why we have this
   // // Output final snapshot of the electric field for verification
@@ -107,6 +127,8 @@ int main() {
   // get the index of the maximum electric field. Compare it to the expected shift from 
   // the initial center
 
+  // verification timing
+  start_time = clock();
   // get the maximum electric field index
   double max_E = 0.0;
   int max_index = 0;
@@ -141,6 +163,9 @@ int main() {
   free(E);
   free(E_at_timestep);
   free(H);
+  end_time = clock();
+  double verification_time = (double)(end_time - start_time) / CLOCKS_PER_SEC;
+  printf("Verification time: %f seconds\n", verification_time);
 
 
   return 0;
