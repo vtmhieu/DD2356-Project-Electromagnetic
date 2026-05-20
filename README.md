@@ -743,103 +743,120 @@ This application simulates electromagnetic wave propagation using the Finite-Dif
 
 We implemented pure message passing parallelization (MPI) in `mpi_v1.c` to enable scale-out across multiple compute nodes on the Dardel supercomputer.
 
-#### 1. Domain Decomposition & Halo Exchange Logic
+1. **Identify compute-intensive parts and implement MPI parallelization**
 
-The global physical grid ($NX$) is divided into local subgrids ($N_{local}$) across $P$ MPI processes. To handle dependencies at the boundaries, we introduced a 1D halo ring:
-* **Grid Partitioning:** Each process $p$ handles a contiguous range from `local_start` to `local_end - 1` of size $N_{local} = NX / P$. Remainder elements ($NX \pmod P$) are distributed to the first few processes to prevent load imbalance.
-* **Ghost Cells (Halos):** Local arrays `E` and `H` are allocated with size $N_{local} + 2$. 
-  - Index `0` is the left halo (stores boundary data from process $p-1$).
-  - Index `N_{local} + 1` is the right halo (stores boundary data from process $p+1$).
-* **Data Swapping (Avoiding Deadlocks):**
-  - Updating $H[i]$ requires $E[i+1]$. Ranks send their first active element `E[1]` to the left and receive the right neighbor's `E[1]` into `E[N_local+1]`.
-  - Updating $E[i]$ requires $H[i-1]$. Ranks send their last active element `H[N_local]` to the right and receive the left neighbor's `H[N_local]` into `H[0]`.
-  - We use `MPI_Sendrecv` to safely shift data bidirectionally between neighbors without risk of deadlock or queue overflows.
+    The global physical grid ($NX$) is divided into local subgrids ($N_{local}$) across $P$ MPI processes. To handle dependencies at the boundaries, we introduced a 1D halo ring:
+    * **Grid Partitioning:** Each process $p$ handles a contiguous range from `local_start` to `local_end - 1` of size $N_{local} = NX / P$. Remainder elements ($NX \pmod P$) are distributed to the first few processes to prevent load imbalance.
+    * **Ghost Cells (Halos):** Local arrays `E` and `H` are allocated with size $N_{local} + 2$. 
+      - Index `0` is the left halo (stores boundary data from process $p-1$).
+      - Index `N_{local} + 1` is the right halo (stores boundary data from process $p+1$).
+    * **Data Swapping (Avoiding Deadlocks):**
+      - Updating $H[i]$ requires $E[i+1]$. Ranks send their first active element `E[1]` to the left and receive the right neighbor's `E[1]` into `E[N_local+1]`.
+      - Updating $E[i]$ requires $H[i-1]$. Ranks send their last active element `H[N_local]` to the right and receive the left neighbor's `H[N_local]` into `H[0]`.
+      - We use `MPI_Sendrecv` to safely shift data bidirectionally between neighbors without risk of deadlock or queue overflows.
 
-```text
-    Rank p-1                       Rank p                       Rank p+1
-[ ... | H[N_local] ]      [ H[0] | H[1] ... H[N_local] ]      [ H[0] | ... ]
-            \________________/                                    /
-              MPI_Sendrecv                                   MPI_Sendrecv
-```
+    ```text
+        Rank p-1                       Rank p                       Rank p+1
+    [ ... | H[N_local] ]      [ H[0] | H[1] ... H[N_local] ]      [ H[0] | ... ]
+                \________________/                                    /
+                  MPI_Sendrecv                                   MPI_Sendrecv
+    ```
 
-* **Boundary Conditions:** The global boundary updates ($E[0] = E[1]$ and $H[NX-1] = H[NX-2]$) are selectively applied only on Rank 0 and Rank $P-1$ respectively, ensuring the system simulates physical absorbing bounds identically to the serial implementation.
+    * **Boundary Conditions:** The global boundary updates ($E[0] = E[1]$ and $H[NX-1] = H[NX-2]$) are selectively applied only on Rank 0 and Rank $P-1$ respectively, ensuring the system simulates physical absorbing bounds identically to the serial implementation.
 
-#### 2. Verification of Correctness
-We validated the correctness of the domain decomposition by running the simulation up to 64 processes. The local peak detection results were gathered at Rank 0 using `MPI_Gather` to find the absolute global maximum:
-```text
-Expected position of maximum electric field: 50000.000000
-Actual position of maximum electric field: 49994.000000
-Relative error: 0.012000%
-```
-The exact matching of the peak index at `49994.00` across all parallel sweeps verifies that the message passing implementation introduces zero physical distortion.
+    To compile and execute the MPI version:
 
-Below are the wave propagation snapshots gathered over 50 intervals from 4 MPI processes, showcasing the correct splitting of the initial pulse:
+    ```bash
+    # Compilation
+    mpicc mpi_v1.c -o mpi_v1 -lm -O0
 
-![MPI Wave Snapshots](/Users/hieuvutongminh/KTH/2025.2.2/MethodsInHPC/DD2356-Project-Electromagnetic/plots/field_plot_mpi.png)
+    # Run locally with 4 processes
+    mpirun -n 4 ./mpi_v1
 
-#### 3. Execution & Compilation Instructions
-To compile and execute the MPI version:
+    # Compile with plotting enabled (generates file snapshots)
+    mpicc mpi_v1.c -o mpi_plot -lm -O0 -DENABLE_PLOTTING
+    mpirun -n 4 ././mpi_plot
+    ```
 
-```bash
-# Compilation
-mpicc mpi_v1.c -o mpi_v1 -lm -O0
+    For supercomputer runs on **Dardel**, we submit the automated sweep via the Slurm batch manager:
+    ```bash
+    sbatch running_scripts/dardel_mpi_run.sh
+    ```
 
-# Run locally with 4 processes
-mpirun -n 4 ./mpi_v1
+2. **Verify the correctness of implementation**
 
-# Compile with plotting enabled (generates file snapshots)
-mpicc mpi_v1.c -o mpi_plot -lm -O0 -DENABLE_PLOTTING
-mpirun -n 4 ./mpi_plot
-```
+    We validated the correctness of the domain decomposition by running the simulation up to 64 processes. The local peak detection results were gathered at Rank 0 using `MPI_Gather` to find the absolute global maximum:
+    ```text
+    Expected position of maximum electric field: 50000.000000
+    Actual position of maximum electric field: 49994.000000
+    Relative error: 0.012000%
+    ```
+    The exact matching of the peak index at `49994.00` across all parallel sweeps verifies that the message passing implementation introduces zero physical distortion.
 
-For supercomputer runs on **Dardel**, we submit the automated sweep via the Slurm batch manager:
-```bash
-sbatch running_scripts/dardel_mpi_run.sh
-```
+    Below are the wave propagation snapshots gathered over 50 intervals from 4 MPI processes, showcasing the correct splitting of the initial pulse:
 
-#### 4. Parallel Speedup & Scaling on the 3 Systems
+    ![MPI Wave Snapshots](plots/field_plot_mpi.png)
 
-##### A. Local Computer (PC)
-The benchmark was executed locally with $NX = 80000$ and $NSTEPS = 20000$ using $P$ processes compiled with `-O0` optimization:
+3. **Model the inter-process communication overhead and analyze how it may affect scalability**
 
-| Processes ($p$) | Execution Time ($T_p$) | Speedup ($S$) | Efficiency ($E$) | Performance Analysis |
-| :---: | :---: | :---: | :---: | :--- |
-| **1** | 5.2400 s | 1.00x | 100.0% | Local Serial Baseline |
-| **2** | 2.6805 s | 1.95x | 97.8% | Near-linear scaling |
-| **4** | 1.9095 s | 2.74x | 68.6% | Scaling begins to degrade |
-| **8** | 1.8141 s | 2.89x | 36.1% | Local physical core boundary bottleneck |
-| **16** | 1.3826 s | 3.79x | 23.7% | Oversubscription overhead |
+    Unlike OpenMP where threads share memory, MPI processes have separate address spaces. The overhead comes from:
+    - **Communication Cost:** Every time step requires 2 halo exchanges using `MPI_Sendrecv` (one for E, one for H). Each exchange transfers exactly 1 double (8 bytes) per direction. Over 20000 steps, this is $2 \times 20000 \times 8 \text{ bytes} \times 2 \text{ directions} \approx 640 \text{ KB}$. This small payload keeps communication overhead very low.
+    - **Synchronization Cost:** `MPI_Sendrecv` acts as an implicit barrier. The slowest rank dictates the global pace. On a shared-memory machine with limited cores, oversubscription causes severe stalls.
+    - **Scalability Impact:** As $P$ increases, the local computation per step decreases, while the number of messages remains the same. Eventually, the communication latency dominates. Furthermore, crossing NUMA nodes (e.g., across socket boundaries) increases latency and synchronization costs.
 
-##### B. Dardel Supercomputer
-The benchmark was executed on the shared partition of the Dardel supercomputer for $NX = 80000$ and $NSTEPS = 20000$ compiled with `-O0` optimization:
+4. **Evaluate parallel speedup compared to the serial code on the 3 computing systems**
 
-| Processes ($p$) | Execution Time ($T_p$) | Speedup ($S$) | Efficiency ($E$) | Performance Analysis |
-| :---: | :---: | :---: | :---: | :--- |
-| **1** | 9.2084 s | 1.00x | 100.0% | Dardel Serial baseline |
-| **2** | 4.8286 s | 1.91x | 95.5% | Minimal communication overhead |
-| **4** | 2.4500 s | 3.76x | 94.0% | High L1/L2 cache locality |
-| **8** | 1.1829 s | 7.78x | 97.3% | Near-perfect parallel efficiency |
-| **16** | 0.6232 s | 14.78x | 92.4% | Superb scale-out (low latency) |
-| **32** | 0.5973 s | 15.42x | 48.2% | **NUMA Drop:** Multi-socket complex boundaries |
-| **64** | 0.2284 s | 40.33x | 63.0% | Recovery: massive AMD EPYC thread scaling |
+    **Local Computer (PC)**
+    The benchmark was executed locally with $NX = 80000$ and $NSTEPS = 20000$ using $P$ processes compiled with `-O0` optimization:
 
-The visualized execution time and speedup curves from our Dardel run:
+    | Processes ($p$) | Execution Time ($T_p$) | Speedup ($S$) | Efficiency ($E$) |
+    | :---: | :---: | :---: | :---: |
+    | **1** | 5.2400 s | 1.00x | 100.0% | 
+    | **2** | 2.6805 s | 1.95x | 97.8% | 
+    | **4** | 1.9095 s | 2.74x | 68.6% | 
+    | **8** | 1.8141 s | 2.89x | 36.1% | 
+    | **16** | 1.3826 s | 3.79x | 23.7% | 
 
-![Dardel MPI Scaling Curves](/Users/hieuvutongminh/KTH/2025.2.2/MethodsInHPC/DD2356-Project-Electromagnetic/plots/dardel_mpi_scaling.png)
+    **Dardel Supercomputer**
+    The benchmark was executed on the shared partition of the Dardel supercomputer for $NX = 80000$ and $NSTEPS = 20000$ compiled with `-O0` optimization:
 
-##### C. School Cluster (TBD)
-*This section will be populated with a Slurm benchmarking run on the School Cluster.*
+    | Processes ($p$) | Execution Time ($T_p$) | Speedup ($S$) | Efficiency ($E$) | 
+    | :---: | :---: | :---: | :---: | 
+    | **1** | 9.2084 s | 1.00x | 100.0% | 
+    | **2** | 4.8286 s | 1.91x | 95.5% | 
+    | **4** | 2.4500 s | 3.76x | 94.0% | 
+    | **8** | 1.1829 s | 7.78x | 97.3% | 
+    | **16** | 0.6232 s | 14.78x | 92.4% | 
+    | **32** | 0.5973 s | 15.42x | 48.2% | 
+    | **64** | 0.2284 s | 40.33x | 63.0% | 
 
-| Processes ($p$) | Execution Time ($T_p$) | Speedup ($S$) | Efficiency ($E$) | Performance Analysis |
-| :---: | :---: | :---: | :---: | :--- |
-| **1** | - s | - | - | - |
-| **2** | - s | - | - | - |
-| **4** | - s | - | - | - |
-| **8** | - s | - | - | - |
-| **16** | - s | - | - | - |
-| **32** | - s | - | - | - |
+    The visualized execution time and speedup curves from our Dardel run:
 
-#### 5. Scalability & Overhead Analysis
-* **Scaling up to 16 Cores:** The MPI parallel efficiency remains above **92%** up to 16 cores. Because the 1D domain update has very low computational work per step, this exceptionally high efficiency shows that the message-passing framework (`MPI_Sendrecv`) introduces almost no synchronization overhead at this range.
-* **The 32-Core Performance Dip (NUMA Bottleneck):** At 32 cores, the efficiency falls off to **48%** (speedup barely increases from $14.78x$ to $15.42x$). This is a classic architectural bottleneck on Dardel's AMD EPYC processors. Compute cores are organized in Core Complexes (CCDs) that share L3 cache. Exceeding 16 processes forces the MPI ranks to communicate across distinct CCD memory boundaries, introducing significant inter-socket bus latency that stalls the stencil computations.
-* **Scale Recovery at 64 Cores:** When moving to 64 cores, the massive compute capability (and high aggregate L2/L3 cache sizes) overcomes the NUMA latency overhead, recovering the speedup to a huge **40.33x** over the serial baseline. This highlights that the algorithm remains highly viable for high-density compute tasks.
+    ![Dardel MPI Scaling Curves](plots/dardel_mpi_scaling.png)
+
+    **School Cluster**
+    The benchmark was executed on the school cluster for $NX = 80000$ and $NSTEPS = 20000$ using $P$ processes compiled with `-O0` optimization:
+
+    | Processes ($p$) | Execution Time ($T_p$) | Speedup ($S$) | Efficiency ($E$) | 
+    | :---: | :---: | :---: | :---: | 
+    | **1** | 6.5394 s | 1.00x | 100.0% | 
+    | **2** | 3.2343 s | 2.02x | 101.1% | 
+    | **4** | 1.7871 s | 3.66x | 91.5% | 
+    | **8** | 1.0835 s | 6.04x | 75.5% | 
+    | **16** | 1.2243 s | 5.34x | 33.4% | 
+
+    The visualized execution time and speedup curves from our school cluster run:
+
+    ![School Cluster MPI Scaling Curves](plots/school_mpi_scaling.png)
+
+5. **Compare those performance metrics with the serial version. Analyze the results.**
+
+    * **Local Machine Scaling:** The maximum speedup is 3.79x with 16 processes. The scaling degrades quickly past 4 processes due to the physical core limit. Oversubscription introduces significant OS-level scheduling overhead, stalling all processes during `MPI_Sendrecv`.
+    * **Dardel Supercomputer Scaling:**
+      - **Up to 16 Cores:** The MPI parallel efficiency remains above **92%** up to 16 cores. Because the 1D domain update has very low computational work per step, this exceptionally high efficiency shows that the message-passing framework (`MPI_Sendrecv`) introduces almost no synchronization overhead at this range.
+      - **The 32-Core Performance Dip (NUMA Bottleneck):** At 32 cores, the efficiency falls off to **48%** (speedup barely increases from $14.78x$ to $15.42x$). This is a classic architectural bottleneck on Dardel's AMD EPYC processors. Compute cores are organized in Core Complexes (CCDs) that share L3 cache. Exceeding 16 processes forces the MPI ranks to communicate across distinct CCD memory boundaries, introducing significant inter-socket bus latency that stalls the stencil computations.
+      - **Scale Recovery at 64 Cores:** When moving to 64 cores, the massive compute capability (and high aggregate L2/L3 cache sizes) overcomes the NUMA latency overhead, recovering the speedup to a huge **40.33x** over the serial baseline. This highlights that the algorithm remains highly viable for high-density compute tasks.
+    * **School Cluster Scaling:** 
+      - The maximum speedup achieved is 6.04x with 8 processes. 
+      - Similar to the local machine, there is a clear hardware boundary. At 16 processes, the performance actually drops (execution time increases from 1.08s to 1.22s, dropping the efficiency to 33.4%). This suggests the school node being used has a maximum of 8 physical cores, and allocating 16 processes forces costly context-switching and oversubscription penalties.
+    * **Comparison with OpenMP:** Compared to OpenMP on Dardel (speedup of 4.26x with 8 threads), MPI achieves better scaling (7.78x with 8 processes). This is likely because MPI processes have independent memory spaces, avoiding the cache coherence traffic and false sharing risks inherent in shared-memory threads.
