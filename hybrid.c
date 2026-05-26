@@ -80,8 +80,8 @@ int main() {
   int *recv_counts = (int *)malloc(size * sizeof(int));
   int *displs      = (int *)malloc(size * sizeof(int));
   for (int r = 0; r < size; r++) {
-    recv_counts[r] = NX / size + (r < NX % size ? 1 : 0);
-    displs[r]      = r * (NX / size) + (r < NX % size ? r : NX % size);
+    recv_counts[r] = NX / size + (has_extra ? 1 : 0);
+    displs[r]      = r * (NX / size) + (has_extra ? r : NX % size);
   }
 
   double allocation_start = MPI_Wtime();
