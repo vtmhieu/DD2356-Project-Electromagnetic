@@ -68,3 +68,9 @@ if __name__ == "__main__":
     output_graph = 'plots/field_plot_mpi.png'
     if os.path.exists(folder):
         plot(folder, output_graph)
+
+    # plot for the hybrid version
+    folder = 'data_for_plotting/hybrid/'
+    output_graph = 'plots/field_plot_hybrid.png'
+    if os.path.exists(folder):
+        plot(folder, output_graph)
