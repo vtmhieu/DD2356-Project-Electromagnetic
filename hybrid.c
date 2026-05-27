@@ -14,10 +14,9 @@
 #define DX 1.0
 #define DT 0.5
 #define PI 3.141592653589793
-#define ENABLE_PLOTTING
 #define NPLOTTINGS 50
 #ifndef THREAD_COUNT
-#define THREAD_COUNT 4
+#define THREAD_COUNT 8
 #endif
 
 void initialize_fields(double *E, double *H) {
@@ -69,7 +68,8 @@ int main() {
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
   MPI_Comm_size(MPI_COMM_WORLD, &size);
 
-  omp_set_num_threads(THREAD_COUNT);
+  if (!getenv("OMP_NUM_THREADS"))
+    omp_set_num_threads(THREAD_COUNT);
 
   int has_extra    = (NX % size) > rank;
   int local_real   = NX / size + (has_extra ? 1 : 0);
@@ -80,8 +80,8 @@ int main() {
   int *recv_counts = (int *)malloc(size * sizeof(int));
   int *displs      = (int *)malloc(size * sizeof(int));
   for (int r = 0; r < size; r++) {
-    recv_counts[r] = NX / size + (has_extra ? 1 : 0);
-    displs[r]      = r * (NX / size) + (has_extra ? r : NX % size);
+    recv_counts[r] = NX / size + (r < NX % size ? 1 : 0);
+    displs[r]      = r * (NX / size) + (r < NX % size ? r : NX % size);
   }
 
   double allocation_start = MPI_Wtime();
