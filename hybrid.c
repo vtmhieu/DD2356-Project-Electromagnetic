@@ -128,10 +128,10 @@ int main() {
   // ── Main FDTD loop ────────────────────────────────────────────────────────
   MPI_Barrier(MPI_COMM_WORLD);
   double main_loop_start = MPI_Wtime();
-  #pragma omp parallel
+  // #pragma omp parallel
   {
     for (int t = 0; t < NSTEPS; t++) {
-      #pragma omp single
+      //#pragma omp single
       {
         nreqs = 0;
         if (rank > 0)       MPI_Irecv(&E[0],          1, MPI_DOUBLE, rank-1, 1, MPI_COMM_WORLD, &reqs[nreqs++]);
@@ -142,13 +142,13 @@ int main() {
 
       update_H_interior(E, H, local_NX);
 
-      #pragma omp single
+      //#pragma omp single
       {
         MPI_Waitall(nreqs, reqs, MPI_STATUSES_IGNORE);
         update_H_boundary(E, H, local_NX, rank, size);
       }
 
-      #pragma omp single
+      //#pragma omp single
       {
         nreqs = 0;
         if (rank > 0)       MPI_Irecv(&H[0],          1, MPI_DOUBLE, rank-1, 1, MPI_COMM_WORLD, &reqs[nreqs++]);
@@ -159,14 +159,14 @@ int main() {
 
       update_E_interior(E, H, local_NX);
 
-      #pragma omp single
+      //#pragma omp single
       {
         MPI_Waitall(nreqs, reqs, MPI_STATUSES_IGNORE);
         update_E_boundary(E, H, local_NX, rank, size);
       }
 
       #ifdef ENABLE_PLOTTING
-      #pragma omp single
+      //#pragma omp single
       if (t % (NSTEPS / NPLOTTINGS) == 0) {
         int snap = t / (NSTEPS / NPLOTTINGS);
         MPI_Gatherv(&E[1], local_real, MPI_DOUBLE,
