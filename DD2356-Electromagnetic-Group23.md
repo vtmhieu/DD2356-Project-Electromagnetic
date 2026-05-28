@@ -230,4 +230,27 @@ All optimizations were targeted at a configuration of 4 nodes, 4 MPI processes, 
 - **Third optimization:** aligning the memory so that when it is fetched from RAM, we are not wasting space for random junk before the start of the array.
   - This didn’t do much (1s version normal, 1.2 seconds version optimized).
 
-GPU offloading failed compilation on both the cluster and Dardel partitions, as well as on personal machine (for schoool cluster, it doesn't recognize paralelization and doesn't send to gpu. On personal computer the Nvidia Cuda library is not working properly, and on Dardel we didn't have access to the GPU partition).
+### GPU Offloading
+Initially, GPU offloading failed compilation on the school cluster and Dardel partitions due to compiler issues and partition access.
+
+However, we successfully resolved the compilation issues on the Ubuntu-based school cluster. The GNU compiler (GCC) was mistakenly passing host default security flags (`-fcf-protection=full` and `-fstack-protector-strong`) to the NVPTX GPU offload compiler during the Link-Time Optimization (LTO) phase, causing the assembler to crash. 
+
+By explicitly disabling these flags, we successfully compiled and ran the OpenMP target offload code:
+```bash
+cc -O3 -fopenmp -fcf-protection=none -fno-stack-protector -no-pie openMP_GPU.c -o gpu_fdtd -lm
+./gpu_fdtd
+```
+
+```
+jovyan@jupyter-hieuvtm:~/DD2356-Project-Electromagnetic$ cc -O2 -fopenmp -fcf-protection=none -fno-stack-protector openMP_GPU.c -o gpu_fdtd -lm
+/usr/bin/ld: /tmp/ccKfHrfQ.crtoffloadtable.o: warning: relocation against `__offload_vars_end' in read-only section `.rodata'
+/usr/bin/ld: warning: creating DT_TEXTREL in a PIE
+jovyan@jupyter-hieuvtm:~/DD2356-Project-Electromagnetic$ ./gpu_fdtd
+
+Expected position of the maximum electric field: 50000.000000
+Actual position of the maximum electric field:   49994.000000
+The maximum electric field is NOT at the expected position.
+Relative error: 0.012000%
+```
+
+The execution yielded the exact expected numerical results (matching the CPU/serial run with a $0.012\%$ relative error), proving that our GPU offloading implementation works correctly.
