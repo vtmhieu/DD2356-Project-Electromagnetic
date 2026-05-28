@@ -19,6 +19,8 @@
 #define THREAD_COUNT 8
 #endif
 
+#define DTDX (DT / DX) 
+
 void initialize_fields(double *E, double *H) {
   double center = NX * DX / 2.0;
   for (int i = 0; i < NX; i++) {
@@ -29,32 +31,32 @@ void initialize_fields(double *E, double *H) {
 }
 
 void update_H_interior(double *E, double *H, int local_NX) {
-  #pragma omp for simd schedule(static)
+  #pragma omp for simd schedule(static) nowait
   for (int i = 2; i < local_NX - 2; i++) {
-    H[i] = H[i] + (DT / DX) * (E[i + 1] - E[i]);
+    H[i] = H[i] + (DTDX) * (E[i + 1] - E[i]);
   }
 }
 
 void update_H_boundary(double *E, double *H, int local_NX, int rank, int size) {
-  H[1] = H[1] + (DT / DX) * (E[2] - E[1]);
+  H[1] = H[1] + (DTDX) * (E[2] - E[1]);
   if (rank < size - 1)
-    H[local_NX - 2] = H[local_NX - 2] + (DT / DX) * (E[local_NX - 1] - E[local_NX - 2]);
+    H[local_NX - 2] = H[local_NX - 2] + (DTDX) * (E[local_NX - 1] - E[local_NX - 2]);
   // absorbing condition
   if (rank == size - 1)
     H[local_NX - 1] = H[local_NX - 2];
 }
 
 void update_E_interior(double *E, double *H, int local_NX) {
-  #pragma omp for simd schedule(static)
+  #pragma omp for simd schedule(static) nowait
   for (int i = 2; i < local_NX - 2; i++) {
-    E[i] = E[i] + (DT / DX) * (H[i] - H[i - 1]);
+    E[i] = E[i] + (DTDX) * (H[i] - H[i - 1]);
   }
 }
 
 void update_E_boundary(double *E, double *H, int local_NX, int rank, int size) {
   if (rank > 0)
-    E[1] = E[1] + (DT / DX) * (H[1] - H[0]);
-  E[local_NX - 2] = E[local_NX - 2] + (DT / DX) * (H[local_NX - 2] - H[local_NX - 3]);
+    E[1] = E[1] + (DTDX) * (H[1] - H[0]);
+  E[local_NX - 2] = E[local_NX - 2] + (DTDX) * (H[local_NX - 2] - H[local_NX - 3]);
   // absorbing condition
   if (rank == 0)
     E[0] = E[1];
@@ -89,11 +91,12 @@ int main() {
   double *global_E = NULL;
   double *global_H = NULL;
   if (rank == 0) {
-    global_E = (double *)malloc(NX * sizeof(double));
-    global_H = (double *)malloc(NX * sizeof(double));
+    global_E = (double *)aligned_alloc(64, NX * sizeof(double));
+    global_H = (double *)aligned_alloc(64, NX * sizeof(double));
   }
-  double *E = (double *)malloc(local_NX * sizeof(double));
-  double *H = (double *)malloc(local_NX * sizeof(double));
+  double *E = (double *)aligned_alloc(64, local_NX * sizeof(double));
+  double *H = (double *)aligned_alloc(64, local_NX * sizeof(double));
+
   double allocation_end = MPI_Wtime();
   if (rank == 0) printf("Allocation time: %f seconds\n", allocation_end - allocation_start);
 
@@ -117,7 +120,7 @@ int main() {
   if (rank == 0) {
     E_at_timestep = (double **) malloc(NPLOTTINGS * sizeof(double*));
     for (int i = 0; i < NPLOTTINGS; i++)
-      E_at_timestep[i] = (double *) malloc(NX * sizeof(double));
+      E_at_timestep[i] = (double *)aligned_alloc(64, NX * sizeof(double));
   }
   double saving_end = MPI_Wtime();
   if (rank == 0) printf("Saving time: %f seconds\n", saving_end - saving_start);
@@ -128,10 +131,10 @@ int main() {
   // ── Main FDTD loop ────────────────────────────────────────────────────────
   MPI_Barrier(MPI_COMM_WORLD);
   double main_loop_start = MPI_Wtime();
-  // #pragma omp parallel
+  #pragma omp parallel
   {
     for (int t = 0; t < NSTEPS; t++) {
-      //#pragma omp single
+      #pragma omp single
       {
         nreqs = 0;
         if (rank > 0)       MPI_Irecv(&E[0],          1, MPI_DOUBLE, rank-1, 1, MPI_COMM_WORLD, &reqs[nreqs++]);
@@ -142,13 +145,13 @@ int main() {
 
       update_H_interior(E, H, local_NX);
 
-      //#pragma omp single
+      #pragma omp single
       {
         MPI_Waitall(nreqs, reqs, MPI_STATUSES_IGNORE);
         update_H_boundary(E, H, local_NX, rank, size);
       }
 
-      //#pragma omp single
+      #pragma omp single
       {
         nreqs = 0;
         if (rank > 0)       MPI_Irecv(&H[0],          1, MPI_DOUBLE, rank-1, 1, MPI_COMM_WORLD, &reqs[nreqs++]);
@@ -159,14 +162,14 @@ int main() {
 
       update_E_interior(E, H, local_NX);
 
-      //#pragma omp single
+      #pragma omp single
       {
         MPI_Waitall(nreqs, reqs, MPI_STATUSES_IGNORE);
         update_E_boundary(E, H, local_NX, rank, size);
       }
 
       #ifdef ENABLE_PLOTTING
-      //#pragma omp single
+      #pragma omp single
       if (t % (NSTEPS / NPLOTTINGS) == 0) {
         int snap = t / (NSTEPS / NPLOTTINGS);
         MPI_Gatherv(&E[1], local_real, MPI_DOUBLE,

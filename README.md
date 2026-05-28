@@ -860,3 +860,14 @@ We implemented pure message passing parallelization (MPI) in `mpi_v1.c` to enabl
       - The maximum speedup achieved is 6.04x with 8 processes. 
       - Similar to the local machine, there is a clear hardware boundary. At 16 processes, the performance actually drops (execution time increases from 1.08s to 1.22s, dropping the efficiency to 33.4%). This suggests the school node being used has a maximum of 8 physical cores, and allocating 16 processes forces costly context-switching and oversubscription penalties.
     * **Comparison with OpenMP:** Compared to OpenMP on Dardel (speedup of 4.26x with 8 threads), MPI achieves better scaling (7.78x with 8 processes). This is likely because MPI processes have independent memory spaces, avoiding the cache coherence traffic and false sharing risks inherent in shared-memory threads.
+
+### Hybrid Optimizations
+We can definetelly see that the main problem is the openMP version. It seems that the more threads we are spawning, the worse performance we get. And it is because we are working on the school cluster. For Dardell, for 4 nodes, 4 tasks (hence 4 MPI), 16 threads (Hence OpenMP), we went down for 300 seconds to 0.7 (instead of having 0 threads and 4 processes on 1 Node). This makes sense, as the overhead of doing thread. And, with having a single node, a single task, it takes 12 seconds. So the speedup is very expectable. 
+All of the optimizations are done on the 4 nodes, 4 MPI processes and 8 threads (hence 8 threads for every node).
+First optimization done was using the nowait for the for paralelization.
+This shaved off 0.04 seconds (0.83 to 0.79). This works as we are just directly doing the synchronization less times. 
+Second optimization is having defined:
+#define DTDX (DT / DX) 
+From the start, so that this operation is not being done every time. This resulted in higher time: 1.2 seconds. This might just be an artefact, as it oesn't make any sense, having lower instructions but at the same time higher time.
+Third optimization is just allgining the memory so that whenever it is being fetched from the RAM, we are not waisting space for random junk that was being seen before the start of the array. This didn't do too much (1s version normal, 1.2 seconds version optimized).
+We were thinking of doing some cache managing (the same way we did for matrices in class), just fetching enough memory to put into L2, and then L1. But the compiler already does this, as it is a simple vector.
