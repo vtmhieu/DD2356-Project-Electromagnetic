@@ -2,6 +2,11 @@
 
 This application simulates electromagnetic wave propagation using the Finite-Difference Time-Domain (FDTD) method.
 
+## Contribution
+*   **Serban-Mihai Ionescu:** Baseline C/C++ Implementation, OpenMP Parallelization, Hybrid Optimizations
+*   **Hieu Vu:**  MPI Parallelization
+*   **Theodor Dan Popescu:** Hybrid OpenMP + MPI
+
 ## 1. Electromagnetics Test Case for Correctness
 
 ### Test Case Description
@@ -84,7 +89,63 @@ When comparing metrics, the OpenMP version shows 3x higher overall cache misses 
 
 
 
-## Hybrid OpenMP + MPI
+## 4. MPI Parallelization
+
+### Compute-Intensive Parts & Implementation
+We implemented pure message passing (MPI) to scale across multiple nodes. The global grid ($NX$) is divided into local subgrids across $P$ processes.
+* **Grid Partitioning & Ghost Cells:** Each local array has two extra indices (halos) for boundary data from neighboring processes.
+* **Data Swapping:** Using `MPI_Sendrecv`, ranks exchange their edge values (e.g., $E[1]$ sent left, $H[N_{local}]$ sent right). This bidirectional shift prevents deadlocks and correctly handles cross-boundary dependencies.
+
+### Verification
+We validated the domain decomposition by running the simulation up to 64 processes. The local peak detection results were gathered at Rank 0 using `MPI_Gather`. The exact matching of the peak index at `49994.00` across all parallel sweeps verifies that the message passing implementation introduces zero physical distortion.
+
+### Communication Overhead & Scalability
+Unlike OpenMP where threads share memory, MPI processes have separate address spaces.
+* **Communication Cost:** Small payloads (2 doubles per direction per step) keep direct communication overhead very low.
+* **Synchronization Cost:** `MPI_Sendrecv` acts as an implicit barrier. As $P$ increases and local computation per step decreases, communication latency starts to dominate, especially when crossing NUMA socket boundaries.
+
+### Parallel Speedup Evaluation
+
+We executed the benchmark locally, on the Dardel supercomputer, and on the school cluster for a large grid ($NX = 80000$ and $NSTEPS = 20000$) using $P$ processes.
+
+**Local Computer (PC)**
+| Processes ($p$) | Execution Time ($T_p$) | Speedup ($S$) | Efficiency ($E$) |
+| :---: | :---: | :---: | :---: |
+| **1** | 5.2400 s | 1.00x | 100.0% | 
+| **2** | 2.6805 s | 1.95x | 97.8% | 
+| **4** | 1.9095 s | 2.74x | 68.6% | 
+| **8** | 1.8141 s | 2.89x | 36.1% | 
+| **16** | 1.3826 s | 3.79x | 23.7% | 
+
+**Dardel Supercomputer**
+| Processes ($p$) | Execution Time ($T_p$) | Speedup ($S$) | Efficiency ($E$) | 
+| :---: | :---: | :---: | :---: | 
+| **1** | 9.2084 s | 1.00x | 100.0% | 
+| **2** | 4.8286 s | 1.91x | 95.5% | 
+| **4** | 2.4500 s | 3.76x | 94.0% | 
+| **8** | 1.1829 s | 7.78x | 97.3% | 
+| **16** | 0.6232 s | 14.78x | 92.4% | 
+| **32** | 0.5973 s | 15.42x | 48.2% | 
+| **64** | 0.2284 s | 40.33x | 63.0% | 
+
+**School Cluster**
+| Processes ($p$) | Execution Time ($T_p$) | Speedup ($S$) | Efficiency ($E$) | 
+| :---: | :---: | :---: | :---: | 
+| **1** | 6.5394 s | 1.00x | 100.0% | 
+| **2** | 3.2343 s | 2.02x | 101.1% | 
+| **4** | 1.7871 s | 3.66x | 91.5% | 
+| **8** | 1.0835 s | 6.04x | 75.5% | 
+| **16** | 1.2243 s | 5.34x | 33.4% | 
+
+### Comparison & Analysis
+* **Local Machine:** The scaling degrades quickly past 4 processes due to the physical core limit. Oversubscription introduces significant OS-level scheduling overhead, stalling all processes during `MPI_Sendrecv`.
+* **Dardel Supercomputer:** Efficiency stays above 92% up to 16 cores. At 32 cores, efficiency falls to 48% due to NUMA architecture bottlenecks (crossing Core Complex boundaries increases latency). However, at 64 cores, the massive compute capability recovers the scaling to a **40.33x** speedup.
+* **School Cluster:** Reaches a peak **6.04x** speedup on 8 processes. At 16 processes, execution time actually increases, suggesting a hard limit of 8 physical cores on the node.
+* **Comparison to OpenMP:** MPI scaled better than OpenMP (e.g., 7.78x vs 4.26x on Dardel for 8 cores) because separate address spaces avoid cache coherence penalties and false sharing inherent to shared memory.
+
+---
+
+## 5. Hybrid OpenMP + MPI
 
 ### Design and Implementation
 
