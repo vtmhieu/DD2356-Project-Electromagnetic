@@ -45,7 +45,7 @@ int main() {
   {
     for (int t = 0; t < NSTEPS; t++) {
 
-      #pragma omp target teams distribute parallel for simd schedule(static)
+      #pragma omp target teams distribute parallel for schedule(static)
       for (int i = 0; i < NX - 1; i++) {
         H[i] = H[i] + DTDX * (E[i + 1] - E[i]);
       }
@@ -54,7 +54,7 @@ int main() {
       #pragma omp target 
       H[NX - 1] = H[NX - 2];
 
-      #pragma omp target teams distribute parallel for simd schedule(static)
+      #pragma omp target teams distribute parallel for schedule(static)
       for (int i = 1; i < NX; i++) {
         E[i] = E[i] + DTDX * (H[i] - H[i - 1]);
       }

@@ -862,12 +862,40 @@ We implemented pure message passing parallelization (MPI) in `mpi_v1.c` to enabl
     * **Comparison with OpenMP:** Compared to OpenMP on Dardel (speedup of 4.26x with 8 threads), MPI achieves better scaling (7.78x with 8 processes). This is likely because MPI processes have independent memory spaces, avoiding the cache coherence traffic and false sharing risks inherent in shared-memory threads.
 
 ### Hybrid Optimizations
-We can definetelly see that the main problem is the openMP version. It seems that the more threads we are spawning, the worse performance we get. And it is because we are working on the school cluster. For Dardell, for 4 nodes, 4 tasks (hence 4 MPI), 16 threads (Hence OpenMP), we went down for 300 seconds to 0.7 (instead of having 0 threads and 4 processes on 1 Node). This makes sense, as the overhead of doing thread. And, with having a single node, a single task, it takes 12 seconds. So the speedup is very expectable. 
-All of the optimizations are done on the 4 nodes, 4 MPI processes and 8 threads (hence 8 threads for every node).
-First optimization done was using the nowait for the for paralelization.
-This shaved off 0.04 seconds (0.83 to 0.79). This works as we are just directly doing the synchronization less times. 
-Second optimization is having defined:
-#define DTDX (DT / DX) 
-From the start, so that this operation is not being done every time. This resulted in higher time: 1.2 seconds. This might just be an artefact, as it oesn't make any sense, having lower instructions but at the same time higher time.
-Third optimization is just allgining the memory so that whenever it is being fetched from the RAM, we are not waisting space for random junk that was being seen before the start of the array. This didn't do too much (1s version normal, 1.2 seconds version optimized).
-We were thinking of doing some cache managing (the same way we did for matrices in class), just fetching enough memory to put into L2, and then L1. But the compiler already does this, as it is a simple vector.
+- We can definetelly see that the main problem is the **OpenMP version**.
+- The more threads we are spawning, the worse performance we get, and this is because we are working on the **school cluster**.
+- For **Dardel**, with 4 nodes, 4 tasks (hence 4 MPI), 16 threads (hence OpenMP), we went down from 300 seconds to 0.7 seconds (instead of having 0 threads and 4 processes on 1 node). This makes sense, as the overhead of threading is large.
+- With a single node and a single task, it takes 12 seconds, so the speedup is very expectable.
+- All of the optimizations are done on 4 nodes, 4 MPI processes and 8 threads (hence 8 threads for every node).
+
+- **First optimization:** using `nowait` for the `for` parallelization.
+  - This shaved off 0.04 seconds (0.83 to 0.79).
+  - This works because we are doing synchronization fewer times.
+- **Second optimization:** defining `#define DTDX (DT / DX)` from the start so that this operation is not done every time.
+  - This resulted in higher time: 1.2 seconds.
+  - This might just be an artefact, as it doesn’t make any sense to have lower instructions but higher time.
+- **Third optimization:** aligning the memory so that when it is fetched from RAM, we are not wasting space for random junk before the start of the array.
+  - This didn’t do much (1s version normal, 1.2 seconds version optimized).
+
+- We were thinking of doing some cache managing (the same way we did for matrices in class), fetching enough memory to put into L2, and then L1.
+  - But the compiler already does this, as it is a *simple vector*.
+
+  For the GPU version, we couldn't get it to run either on the school cluster or on the dardel. It seems that the school cluster cannot compile it for the gpu and use paralelization, hence we get terrible results.
+  For dardel, I don't seem to have access to the gpu partition.
+
+  ```bash
+    #!/bin/bash -l
+    #SBATCH -J gpu_fdtd
+    #SBATCH -t 00:10:00
+    #SBATCH -A edu26.DD2356
+    #SBATCH -p gpu              
+    #SBATCH --nodes=1
+    #SBATCH --ntasks-per-node=1
+    #SBATCH --gpus-per-node=1
+    #SBATCH -e error_file.e
+    #SBATCH -o output_file.o
+
+    module load PrgEnv-cray rocm
+    export ROCR_VISIBLE_DEVICES=0
+    srun ./gpu_fdtd
+    ```
